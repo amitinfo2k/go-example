@@ -15,7 +15,11 @@ Setup development environment for developing go application and bundle it as mic
    - Download unzip and add go/bin directory in PATH variable
    - Create a directory GOROOT e.g. /root/GOROOT/ 
    - and set environment variable GOPATH e.g. export GOPATH=/root/GOROOT/
- 
+
+### Install gRPC,Protoc,protoc-gen-go
+    
+	scrips/install-grpc-deps.sh
+	 
 ### References
    - https://docs.docker.com/engine/installation/linux/docker-ce/ubuntu/
    - https://golang.org/
