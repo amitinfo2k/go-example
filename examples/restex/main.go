@@ -12,6 +12,7 @@ import (
 	"time"
 	"io/ioutil"
   	"encoding/json"
+	"strings"
 	"github.com/gorilla/mux"
 )
 
@@ -24,6 +25,18 @@ type TCPDumpRequest struct {
 type TCPDumpResponse struct {
 	Status   string `json:"status"`
 	Pcapfile string `json:"pcap_file"`
+}
+
+func createDir(filePath string) error {
+	parts := strings.Split(filePath, "/")
+	dir := ""
+	for s := range parts {
+		if s < (len(parts) - 1) {
+			fmt.Println("Out:", s, parts[s])
+			dir += parts[s] + "/"
+		}
+	}
+	return os.MkdirAll(dir, os.ModePerm)
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -64,16 +77,22 @@ func tcpdumpHandler(w http.ResponseWriter, r *http.Request) {
 		if msg.Action == "start" {
 			if pid == -1 {
 	                	filePath := os.Getenv("PCAP_DIR")+"/"+ msg.Pcapfile 
-				fmt.Println("[DEBUG] tcpdump start")
-				cmd := exec.Command("tcpdump","-i","any","-w",filePath)
-				err := cmd.Start()
+				err := createDir(filePath)
 				if err != nil {
-					fmt.Println("[ERROR] tcpdump start",err)
+					resp.Status = "Failed to create dir"
+					fmt.Printf("[ERROR]Failed to create dir %s", err)
+				}else{
+					fmt.Println("[DEBUG] tcpdump start")
+					cmd := exec.Command("tcpdump","-i","any","-w",filePath)
+					err := cmd.Start()
+					if err != nil {
+						fmt.Println("[ERROR] tcpdump start",err)
+					}
+					pid = cmd.Process.Pid
+					fmt.Println("Started tcpdump pid",cmd.Process.Pid)  
+					resp.Status = "Started"
+					resp.Pcapfile = msg.Pcapfile
 				}
-				pid = cmd.Process.Pid
-				fmt.Println("Started tcpdump pid",cmd.Process.Pid)  
-				resp.Status = "Started"
-				resp.Pcapfile = msg.Pcapfile
 				
 			}else{
 				resp.Status = "Already running"
@@ -84,15 +103,19 @@ func tcpdumpHandler(w http.ResponseWriter, r *http.Request) {
 			fmt.Println("[DEBUG] tcpdump stop ",pid)
 			
 			process,err := os.FindProcess(pid)
-			if err != nil {
+			if err == nil {
+				if err = process.Kill(); err == nil {
+					resp.Status = "Stopped"
+				}else{
+					resp.Status = "Failed to stop"					
+					fmt.Println("[ERROR] failed to kill process  ",pid)
+				}
+			}else{
+				resp.Status = "Process not found"
 				fmt.Println("[ERROR] process not found ",pid)
 			}
 			
-			if err = process.Kill(); err != nil {
-				fmt.Println("[ERROR] failed to kill process  ",pid)
-			}
 			pid = -1
-			resp.Status = "Stopped"
 			resp.Pcapfile = msg.Pcapfile
 			
 		}
